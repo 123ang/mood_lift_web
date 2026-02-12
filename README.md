@@ -60,10 +60,10 @@ npm run dev
 npm start
 ```
 
-The server will start on `http://localhost:3000`
-- Landing page: `http://localhost:3000`
-- API: `http://localhost:3000/api`
-- Health check: `http://localhost:3000/api/health`
+The server will start on `http://localhost:3013`
+- Landing page: `http://localhost:3013`
+- API: `http://localhost:3013/api`
+- Health check: `http://localhost:3013/api/health`
 
 ## API Endpoints
 
