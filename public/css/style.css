@@ -273,7 +273,10 @@ button {
 }
 
 .logo-icon {
-    font-size: 1.4em;
+    width: 2rem;
+    height: 2rem;
+    object-fit: contain;
+    display: block;
 }
 
 .nav__menu {
@@ -995,53 +998,53 @@ button {
 .footer {
     background: var(--clr-dark);
     color: var(--clr-gray-400);
-    padding: 60px 0 0;
+    padding: 32px 0 0;
 }
 
 .footer__top {
     display: grid;
     grid-template-columns: 1fr 2fr;
-    gap: 60px;
-    padding-bottom: 48px;
+    gap: 32px;
+    padding-bottom: 24px;
     border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
 .footer__logo {
-    font-size: var(--fs-xl);
+    font-size: var(--fs-lg);
     font-weight: var(--fw-bold);
     color: var(--clr-white);
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-bottom: 12px;
+    margin-bottom: 6px;
 }
 
 .footer__tagline {
-    font-size: var(--fs-sm);
-    line-height: 1.7;
-    max-width: 280px;
+    font-size: var(--fs-xs);
+    line-height: 1.5;
+    max-width: 260px;
 }
 
 .footer__links {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 40px;
+    gap: 24px;
 }
 
 .footer__col h4 {
     color: var(--clr-white);
-    font-size: var(--fs-sm);
+    font-size: var(--fs-xs);
     font-weight: var(--fw-semi);
     text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 16px;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
 }
 
 .footer__col a {
     display: block;
     font-size: var(--fs-sm);
     color: var(--clr-gray-400);
-    padding: 4px 0;
+    padding: 2px 0;
     transition: color var(--transition-fast);
 }
 
@@ -1050,7 +1053,7 @@ button {
 }
 
 .footer__bottom {
-    padding: 24px 0;
+    padding: 16px 0;
     text-align: center;
     font-size: var(--fs-xs);
 }
@@ -1177,12 +1180,12 @@ button {
     /* Footer */
     .footer__top {
         grid-template-columns: 1fr;
-        gap: 40px;
+        gap: 24px;
     }
 
     .footer__links {
         grid-template-columns: repeat(3, 1fr);
-        gap: 24px;
+        gap: 20px;
     }
 }
 
@@ -1232,7 +1235,7 @@ button {
 
     .footer__links {
         grid-template-columns: 1fr;
-        gap: 28px;
+        gap: 20px;
     }
 
     .step {
