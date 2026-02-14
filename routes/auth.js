@@ -27,7 +27,9 @@ router.post('/register', async (req, res) => {
     const result = await query(
       `INSERT INTO users (email, username, password_hash, points_balance, total_points_earned)
        VALUES ($1, $2, $3, 5, 5)
-       RETURNING id, email, username, points_balance, current_streak, total_checkins, total_points_earned, created_at`,
+       RETURNING id, email, username, points, points_balance, current_streak, last_checkin,
+                 total_checkins, total_points_earned, notification_time, notifications_enabled,
+                 is_admin, created_at`,
       [email, username, password_hash]
     );
 
@@ -37,7 +39,8 @@ router.post('/register', async (req, res) => {
     res.status(201).json({ token, user });
   } catch (err) {
     console.error('Register error:', err);
-    res.status(500).json({ error: 'Server error' });
+    const message = process.env.NODE_ENV !== 'production' ? err.message : 'Server error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -67,7 +70,8 @@ router.post('/login', async (req, res) => {
     res.json({ token, user });
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({ error: 'Server error' });
+    const message = process.env.NODE_ENV !== 'production' ? err.message : 'Server error';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -75,9 +79,9 @@ router.post('/login', async (req, res) => {
 router.get('/profile', authenticate, async (req, res) => {
   try {
     const result = await query(
-      `SELECT id, email, username, points_balance, current_streak, last_checkin,
+      `SELECT id, email, username, points, points_balance, current_streak, last_checkin,
               total_checkins, total_points_earned, notification_time, notifications_enabled,
-              role, created_at
+              is_admin, created_at
        FROM users WHERE id = $1`,
       [req.user.id]
     );
@@ -104,9 +108,9 @@ router.put('/profile', authenticate, async (req, res) => {
            notification_time = COALESCE($2, notification_time),
            notifications_enabled = COALESCE($3, notifications_enabled)
        WHERE id = $4
-       RETURNING id, email, username, points_balance, current_streak, last_checkin,
+       RETURNING id, email, username, points, points_balance, current_streak, last_checkin,
                  total_checkins, total_points_earned, notification_time, notifications_enabled,
-                 role, created_at`,
+                 is_admin, created_at`,
       [username, notification_time, notifications_enabled, req.user.id]
     );
 

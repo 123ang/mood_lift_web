@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3013;
+const PORT = process.env.PORT || 3000;
 
 // Security middleware
 app.use(helmet({
@@ -51,9 +51,20 @@ app.use('/api/saved', savedRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check (includes DB connectivity in development)
+const { query } = require('./config/database');
+app.get('/api/health', async (req, res) => {
+    const out = { status: 'ok', timestamp: new Date().toISOString() };
+    if (process.env.NODE_ENV !== 'production') {
+        try {
+            await query('SELECT 1');
+            out.database = 'ok';
+        } catch (err) {
+            out.database = 'error';
+            out.databaseMessage = err.message;
+        }
+    }
+    res.json(out);
 });
 
 // Landing page fallback
