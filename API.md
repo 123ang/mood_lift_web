@@ -1,6 +1,8 @@
 # MoodLift API Documentation
 
-Base URL: `https://your-domain.com/api` (e.g. `https://moodlift.suntzutechnologies.com/api`)
+**Production base URL:** `https://moodlift.suntzutechnologies.com/api`
+
+For deployment (Nginx, PM2, PostgreSQL), see [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ---
 
