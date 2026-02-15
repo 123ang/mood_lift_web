@@ -275,6 +275,8 @@ npm run db:setup   # only if there are schema changes
 pm2 restart moodlift
 ```
 
+**If `git pull` fails** because of `node_modules` (tracked or “would be overwritten”): run `rm -rf node_modules`, then `git pull`, then `npm ci --omit=dev`, then `pm2 restart moodlift`.
+
 ---
 
 ## Troubleshooting
