@@ -1,14 +1,24 @@
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config();
+
+// Load .env from project root (so it works no matter where node is started from)
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
+// pg driver requires password to be a string (never undefined/null). Coerce it.
+const rawPassword = process.env.DB_PASSWORD;
+const password = rawPassword != null ? String(rawPassword) : '';
+
+if (process.env.NODE_ENV !== 'production') {
+    console.log('[DB] password type:', typeof password, '| length:', password.length);
+}
 
 const pool = new Pool({
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT) || 5432,
     database: process.env.DB_NAME || 'moodlift',
     user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || '',
+    password: password,
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,

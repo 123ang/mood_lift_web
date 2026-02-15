@@ -60,10 +60,14 @@ npm run dev
 npm start
 ```
 
-The server will start on `http://localhost:3013`
-- Landing page: `http://localhost:3013`
-- API: `http://localhost:3013/api`
-- Health check: `http://localhost:3013/api/health`
+The server will start on `http://localhost:3000` (or the port in your `.env`).
+- Landing page: `http://localhost:3000`
+- API: `http://localhost:3000/api`
+- Health check: `http://localhost:3000/api/health`
+
+### 5. Test with the iOS app
+
+The MoodLift iOS app is configured to use `http://localhost:3000/api` when running in the simulator. Keep this backend running, then open the iOS project and run the app (⌘R). Sign up and login will work against this local API.
 
 ## API Endpoints
 
