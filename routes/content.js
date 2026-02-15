@@ -23,13 +23,15 @@ router.get('/:category', optionalAuth, async (req, res) => {
     const params = [category, limit, offset];
 
     if (req.user) {
-      selectExtra = ', cv.vote_type AS user_vote';
-      joinExtra = `LEFT JOIN content_votes cv ON cv.content_id = c.id AND cv.user_id = $4`;
+      selectExtra = `, cv.vote_type AS user_vote,
+                       CASE WHEN uu.id IS NOT NULL THEN true ELSE false END AS is_unlocked`;
+      joinExtra = `LEFT JOIN content_votes cv ON cv.content_id = c.id AND cv.user_id = $4
+                   LEFT JOIN user_unlocks uu ON uu.content_id = c.id AND uu.user_id = $4`;
       params.push(req.user.id);
     }
 
     const result = await query(
-      `SELECT c.*, u.username AS submitted_by_username${selectExtra}
+      `SELECT c.*, u.username AS submitter_username${selectExtra}
        FROM content c
        LEFT JOIN users u ON u.id = c.submitted_by
        ${joinExtra}
@@ -47,19 +49,69 @@ router.get('/:category', optionalAuth, async (req, res) => {
     const total = parseInt(countResult.rows[0].count);
 
     res.json({
-      content: result.rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
+      data: result.rows,
+      total,
+      page,
+      total_pages: Math.ceil(total / limit)
     });
   } catch (err) {
     console.error('Get content error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+// Helper: build nested daily content items from flat rows
+function buildDailyItems(rows) {
+  return rows.map(row => ({
+    id: row.id,
+    content_id: row.content_id,
+    category: row.dca_category || row.category,
+    position_in_day: row.position_in_day,
+    is_unlocked: row.is_unlocked,
+    content: {
+      id: row.c_id,
+      content_text: row.content_text,
+      question: row.question,
+      answer: row.answer,
+      option_a: row.option_a,
+      option_b: row.option_b,
+      option_c: row.option_c,
+      option_d: row.option_d,
+      correct_option: row.correct_option,
+      author: row.author,
+      category: row.c_category,
+      content_type: row.content_type,
+      submitted_by: row.submitted_by,
+      submitter_username: row.submitter_username,
+      status: row.status,
+      upvotes: row.upvotes,
+      downvotes: row.downvotes,
+      report_count: row.report_count,
+      user_vote: row.user_vote || null,
+      is_unlocked: row.is_unlocked,
+      created_at: row.c_created_at
+    }
+  }));
+}
+
+// Daily content SQL
+const DAILY_SELECT_SQL = `
+  SELECT dca.id, dca.content_id, dca.category AS dca_category, dca.position_in_day,
+         CASE WHEN uu.id IS NOT NULL THEN true ELSE false END AS is_unlocked,
+         c.id AS c_id, c.content_text, c.question, c.answer, c.option_a, c.option_b,
+         c.option_c, c.option_d, c.correct_option, c.author, c.category AS c_category,
+         c.content_type, c.submitted_by, c.status, c.upvotes, c.downvotes, c.report_count,
+         c.created_at AS c_created_at,
+         u.username AS submitter_username,
+         cv.vote_type AS user_vote
+  FROM daily_content_assignments dca
+  JOIN content c ON c.id = dca.content_id
+  LEFT JOIN users u ON u.id = c.submitted_by
+  LEFT JOIN user_unlocks uu ON uu.content_id = c.id AND uu.user_id = $1
+  LEFT JOIN content_votes cv ON cv.content_id = c.id AND cv.user_id = $1
+  WHERE dca.user_id = $1 AND dca.category = $2
+    AND dca.assignment_date = CURRENT_DATE
+  ORDER BY dca.position_in_day ASC`;
 
 // GET /:category/daily
 router.get('/:category/daily', authenticate, async (req, res) => {
@@ -68,22 +120,10 @@ router.get('/:category/daily', authenticate, async (req, res) => {
     const userId = req.user.id;
 
     // Check for existing daily assignments today
-    const existing = await query(
-      `SELECT dca.*, c.content_text, c.question, c.answer, c.option_a, c.option_b,
-              c.option_c, c.option_d, c.correct_option, c.author, c.category,
-              c.content_type, c.upvotes, c.downvotes,
-              CASE WHEN uu.id IS NOT NULL THEN true ELSE false END AS unlocked
-       FROM daily_content_assignments dca
-       JOIN content c ON c.id = dca.content_id
-       LEFT JOIN user_unlocks uu ON uu.content_id = c.id AND uu.user_id = $1
-       WHERE dca.user_id = $1 AND dca.category = $2
-         AND dca.assigned_date = CURRENT_DATE
-       ORDER BY dca.position ASC`,
-      [userId, category]
-    );
+    const existing = await query(DAILY_SELECT_SQL, [userId, category]);
 
     if (existing.rows.length > 0) {
-      return res.json({ daily_content: existing.rows });
+      return res.json(buildDailyItems(existing.rows));
     }
 
     // Create new daily assignments
@@ -99,7 +139,7 @@ router.get('/:category/daily', authenticate, async (req, res) => {
     );
 
     if (available.rows.length === 0) {
-      return res.json({ daily_content: [] });
+      return res.json([]);
     }
 
     const insertValues = [];
@@ -113,27 +153,15 @@ router.get('/:category/daily', authenticate, async (req, res) => {
     }
 
     await query(
-      `INSERT INTO daily_content_assignments (user_id, content_id, category, position, assigned_date)
+      `INSERT INTO daily_content_assignments (user_id, content_id, category, position_in_day, assignment_date)
        VALUES ${insertValues.join(', ')}`,
       insertParams
     );
 
     // Fetch the newly created assignments
-    const assignments = await query(
-      `SELECT dca.*, c.content_text, c.question, c.answer, c.option_a, c.option_b,
-              c.option_c, c.option_d, c.correct_option, c.author, c.category,
-              c.content_type, c.upvotes, c.downvotes,
-              CASE WHEN uu.id IS NOT NULL THEN true ELSE false END AS unlocked
-       FROM daily_content_assignments dca
-       JOIN content c ON c.id = dca.content_id
-       LEFT JOIN user_unlocks uu ON uu.content_id = c.id AND uu.user_id = $1
-       WHERE dca.user_id = $1 AND dca.category = $2
-         AND dca.assigned_date = CURRENT_DATE
-       ORDER BY dca.position ASC`,
-      [userId, category]
-    );
+    const assignments = await query(DAILY_SELECT_SQL, [userId, category]);
 
-    res.json({ daily_content: assignments.rows });
+    res.json(buildDailyItems(assignments.rows));
   } catch (err) {
     console.error('Get daily content error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -205,7 +233,20 @@ router.post('/:id/vote', authenticate, async (req, res) => {
       [upvotes, downvotes, id]
     );
 
-    res.json({ upvotes, downvotes });
+    // Return the full updated content item
+    const result = await query(
+      `SELECT c.*, u.username AS submitter_username,
+              cv.vote_type AS user_vote,
+              CASE WHEN uu.id IS NOT NULL THEN true ELSE false END AS is_unlocked
+       FROM content c
+       LEFT JOIN users u ON u.id = c.submitted_by
+       LEFT JOIN content_votes cv ON cv.content_id = c.id AND cv.user_id = $2
+       LEFT JOIN user_unlocks uu ON uu.content_id = c.id AND uu.user_id = $2
+       WHERE c.id = $1`,
+      [id, req.user.id]
+    );
+
+    res.json(result.rows[0]);
   } catch (err) {
     console.error('Vote error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -284,12 +325,12 @@ router.post('/:id/unlock', authenticate, async (req, res) => {
 
     // Create points transaction
     await query(
-      `INSERT INTO points_transactions (user_id, amount, type, description)
+      `INSERT INTO points_transactions (user_id, points_amount, transaction_type, description)
        VALUES ($1, $2, 'spent', 'Unlocked content')`,
       [userId, -cost]
     );
 
-    res.json({ message: 'Content unlocked', cost, new_balance: balance - cost });
+    res.json({ message: 'Content unlocked', points_spent: cost, remaining_balance: balance - cost });
   } catch (err) {
     console.error('Unlock error:', err);
     res.status(500).json({ error: 'Server error' });

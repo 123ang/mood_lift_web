@@ -85,10 +85,15 @@ When exceeded, the API returns `429` with: `{ "error": "Too many requests, pleas
     "id": "uuid",
     "email": "user@example.com",
     "username": "johndoe",
+    "points": 5,
     "points_balance": 5,
     "current_streak": 0,
+    "last_checkin": null,
     "total_checkins": 0,
     "total_points_earned": 5,
+    "notification_time": "08:00:00",
+    "notifications_enabled": true,
+    "is_admin": false,
     "created_at": "2025-02-13T12:00:00.000Z"
   }
 }
@@ -126,6 +131,7 @@ When exceeded, the API returns `429` with: `{ "error": "Too many requests, pleas
   "id": "uuid",
   "email": "user@example.com",
   "username": "johndoe",
+  "points": 15,
   "points_balance": 15,
   "current_streak": 3,
   "last_checkin": "2025-02-13T00:00:00.000Z",
@@ -133,7 +139,7 @@ When exceeded, the API returns `429` with: `{ "error": "Too many requests, pleas
   "total_points_earned": 50,
   "notification_time": "08:00:00",
   "notifications_enabled": true,
-  "role": null,
+  "is_admin": false,
   "created_at": "2025-01-01T00:00:00.000Z"
 }
 ```
@@ -207,13 +213,13 @@ Content types: `text` | `quiz` | `qa`
 | limit | number | 20 | Items per page |
 | sort | string | `newest` | `newest` or `top_rated` |
 
-**Headers:** `Authorization: Bearer <token>` optional. If sent, each content item includes `user_vote`: `"up"` | `"down"` | `null`.
+**Headers:** `Authorization: Bearer <token>` optional. If sent, each content item includes `user_vote`: `"up"` | `"down"` | `null`, and `is_unlocked`: `true` | `false`.
 
 **Success:** `200`
 
 ```json
 {
-  "content": [
+  "data": [
     {
       "id": "uuid",
       "content_text": "Optional text",
@@ -228,20 +234,19 @@ Content types: `text` | `quiz` | `qa`
       "category": "encouragement",
       "content_type": "text",
       "submitted_by": "uuid",
+      "submitter_username": "johndoe",
       "status": "active",
       "upvotes": 10,
       "downvotes": 1,
-      "created_at": "2025-02-13T12:00:00.000Z",
-      "submitted_by_username": "johndoe",
-      "user_vote": "up"
+      "report_count": 0,
+      "user_vote": "up",
+      "is_unlocked": true,
+      "created_at": "2025-02-13T12:00:00.000Z"
     }
   ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 100,
-    "totalPages": 5
-  }
+  "total": 100,
+  "page": 1,
+  "total_pages": 5
 }
 ```
 
@@ -254,15 +259,15 @@ Returns today’s daily content for the authenticated user. If none exist, new a
 **Success:** `200`
 
 ```json
-{
-  "daily_content": [
-    {
+[
+  {
+    "id": "uuid",
+    "content_id": "uuid",
+    "category": "encouragement",
+    "position_in_day": 1,
+    "is_unlocked": false,
+    "content": {
       "id": "uuid",
-      "user_id": "uuid",
-      "content_id": "uuid",
-      "category": "encouragement",
-      "position": 1,
-      "assigned_date": "2025-02-13",
       "content_text": "...",
       "question": "...",
       "answer": "...",
@@ -272,13 +277,20 @@ Returns today’s daily content for the authenticated user. If none exist, new a
       "option_d": "...",
       "correct_option": "a",
       "author": "...",
+      "category": "encouragement",
       "content_type": "quiz",
+      "submitted_by": "uuid",
+      "submitter_username": "johndoe",
+      "status": "active",
       "upvotes": 0,
       "downvotes": 0,
-      "unlocked": false
+      "report_count": 0,
+      "user_vote": null,
+      "is_unlocked": false,
+      "created_at": "2025-02-13T12:00:00.000Z"
     }
-  ]
-}
+  }
+]
 ```
 
 ---
@@ -323,12 +335,31 @@ For quiz/qa, set `question`, `answer`, and options as needed. `content_type` def
 
 `vote_type`: `"up"` | `"down"`. Re-voting updates the vote.
 
-**Success:** `200`
+**Success:** `200` – returns the full updated content item:
 
 ```json
 {
+  "id": "uuid",
+  "content_text": "...",
+  "question": null,
+  "answer": null,
+  "option_a": null,
+  "option_b": null,
+  "option_c": null,
+  "option_d": null,
+  "correct_option": null,
+  "author": "...",
+  "category": "encouragement",
+  "content_type": "text",
+  "submitted_by": "uuid",
+  "submitter_username": "johndoe",
+  "status": "active",
   "upvotes": 11,
-  "downvotes": 1
+  "downvotes": 1,
+  "report_count": 0,
+  "user_vote": "up",
+  "is_unlocked": true,
+  "created_at": "2025-02-13T12:00:00.000Z"
 }
 ```
 
@@ -361,8 +392,8 @@ Unlocks content for the user. First unlock costs 5 points; each additional unloc
 ```json
 {
   "message": "Content unlocked",
-  "cost": 5,
-  "new_balance": 10
+  "points_spent": 5,
+  "remaining_balance": 10
 }
 ```
 
@@ -403,12 +434,10 @@ Points: 1 point for streaks 1–6 days; from day 7, `round((5/7) * streak)`; +10
 
 ```json
 {
-  "current_streak": 4,
-  "last_checkin": "2025-02-13T12:00:00.000Z",
-  "total_checkins": 11,
+  "message": "Check-in successful",
   "points_earned": 2,
-  "points_balance": 17,
-  "can_checkin": false
+  "new_streak": 4,
+  "total_points": 17
 }
 ```
 
@@ -484,25 +513,22 @@ Points: 1 point for streaks 1–6 days; from day 7, `round((5/7) * streak)`; +10
 
 ```json
 {
-  "transactions": [
+  "data": [
     {
       "id": "uuid",
-      "amount": 5,
-      "type": "earned",
+      "transaction_type": "earned",
+      "points_amount": 5,
       "description": "Daily check-in day 7",
       "created_at": "2025-02-13T12:00:00.000Z"
     }
   ],
-  "pagination": {
-    "page": 1,
-    "limit": 50,
-    "total": 20,
-    "totalPages": 1
-  }
+  "total": 20,
+  "page": 1,
+  "total_pages": 1
 }
 ```
 
-`type`: `earned` | `spent`. `amount` is positive for earned, negative for spent.
+`transaction_type`: `earned` | `spent`. `points_amount` is positive for earned, negative for spent.
 
 ---
 

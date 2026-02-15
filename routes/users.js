@@ -12,7 +12,7 @@ router.get('/points-history', authenticate, async (req, res) => {
     const offset = (page - 1) * limit;
 
     const result = await query(
-      `SELECT id, amount, type, description, created_at
+      `SELECT id, transaction_type, points_amount, description, created_at
        FROM points_transactions
        WHERE user_id = $1
        ORDER BY created_at DESC
@@ -28,13 +28,10 @@ router.get('/points-history', authenticate, async (req, res) => {
     const total = parseInt(countResult.rows[0].count);
 
     res.json({
-      transactions: result.rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
+      data: result.rows,
+      total,
+      page,
+      total_pages: Math.ceil(total / limit)
     });
   } catch (err) {
     console.error('Points history error:', err);

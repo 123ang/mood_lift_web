@@ -117,7 +117,7 @@ router.post('/', authenticate, async (req, res) => {
     );
 
     await query(
-      `INSERT INTO points_transactions (user_id, amount, type, description)
+      `INSERT INTO points_transactions (user_id, points_amount, transaction_type, description)
        VALUES ($1, $2, 'earned', $3)`,
       [req.user.id, pointsEarned, `Daily check-in day ${newStreak}`]
     );
@@ -125,12 +125,10 @@ router.post('/', authenticate, async (req, res) => {
     const updatedUser = updated.rows[0];
 
     res.json({
-      current_streak: updatedUser.current_streak,
-      last_checkin: updatedUser.last_checkin,
-      total_checkins: updatedUser.total_checkins,
+      message: 'Check-in successful',
       points_earned: pointsEarned,
-      points_balance: updatedUser.points_balance,
-      can_checkin: false
+      new_streak: updatedUser.current_streak,
+      total_points: updatedUser.points_balance
     });
   } catch (err) {
     console.error('Check-in error:', err);
