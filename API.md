@@ -192,12 +192,74 @@ Content types: `text` | `quiz` | `qa`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| GET | `/api/content/feed` | Optional | Community feed (all user submissions) |
+| GET | `/api/content/mine` | Yes | Current user's submissions |
 | GET | `/api/content/:category` | Optional | List content by category (paginated) |
 | GET | `/api/content/:category/daily` | Yes | Get or create today’s daily content for user |
-| POST | `/api/content/submit` | Yes | Submit new content |
+| POST | `/api/content/submit` | Yes | Submit new content (awards 1 point) |
 | POST | `/api/content/:id/vote` | Yes | Upvote or downvote |
 | POST | `/api/content/:id/report` | Yes | Report content |
 | POST | `/api/content/:id/unlock` | Yes | Unlock content with points |
+
+---
+
+#### GET `/api/content/feed`
+
+Returns community feed showing all user-submitted content across all categories.
+
+**Query:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| page | number | 1 | Page number |
+| limit | number | 20 | Items per page |
+| sort | string | `newest` | `newest` or `top_rated` |
+
+**Headers:** `Authorization: Bearer <token>` optional. If sent, each content item includes `user_vote` and `is_unlocked`.
+
+**Success:** `200`
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "content_text": "You've got this!",
+      "category": "encouragement",
+      "content_type": "text",
+      "submitted_by": "uuid",
+      "submitter_username": "johndoe",
+      "status": "active",
+      "upvotes": 5,
+      "downvotes": 0,
+      "report_count": 0,
+      "user_vote": null,
+      "is_unlocked": false,
+      "created_at": "2025-02-13T12:00:00.000Z"
+    }
+  ],
+  "total": 42,
+  "page": 1,
+  "total_pages": 3
+}
+```
+
+---
+
+#### GET `/api/content/mine`
+
+Returns the current user's submitted content.
+
+**Query:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| page | number | 1 | Page number |
+| limit | number | 20 | Items per page |
+
+**Headers:** `Authorization: Bearer <token>` required.
+
+**Success:** `200` – same shape as feed (data, total, page, total_pages).
 
 ---
 
@@ -317,7 +379,7 @@ Returns today’s daily content for the authenticated user. If none exist, new a
 
 For quiz/qa, set `question`, `answer`, and options as needed. `content_type` defaults to `text`.
 
-**Success:** `201` – full content object as stored.
+**Success:** `201` – full content object as stored. **User is awarded 1 point** (added to `points_balance` and `total_points_earned`).
 
 **Errors:** `400` – category missing.
 

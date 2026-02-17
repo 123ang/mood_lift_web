@@ -36,6 +36,8 @@ router.post('/register', async (req, res) => {
     const user = result.rows[0];
     const token = generateToken(user.id);
 
+    console.log('[SIGNUP] resolved users.id for', email, ':', user.id);
+
     res.status(201).json({ token, user });
   } catch (err) {
     console.error('Register error:', err);
@@ -67,6 +69,8 @@ router.post('/login', async (req, res) => {
     const token = generateToken(user.id);
     delete user.password_hash;
 
+    console.log('[LOGIN] resolved users.id for', email, ':', user.id);
+
     res.json({ token, user });
   } catch (err) {
     console.error('Login error:', err);
@@ -90,7 +94,14 @@ router.get('/profile', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(result.rows[0]);
+    const row = result.rows[0];
+    console.log('[PROFILE] req.user.id:', req.user.id, '| DB row:', { 
+      id: row.id, 
+      email: row.email, 
+      points_balance: row.points_balance 
+    });
+
+    res.json(row);
   } catch (err) {
     console.error('Get profile error:', err);
     res.status(500).json({ error: 'Server error' });

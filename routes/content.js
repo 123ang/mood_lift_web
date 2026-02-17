@@ -4,6 +4,100 @@ const { authenticate, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
+// GET /feed - Community feed (all user submissions)
+router.get('/feed', optionalAuth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const sort = req.query.sort || 'newest';
+    const offset = (page - 1) * limit;
+
+    let orderClause = 'c.created_at DESC';
+    if (sort === 'top_rated') {
+      orderClause = '(c.upvotes - c.downvotes) DESC';
+    }
+
+    let selectExtra = '';
+    let joinExtra = '';
+    const params = [limit, offset];
+
+    if (req.user) {
+      selectExtra = `, cv.vote_type AS user_vote,
+                       CASE WHEN uu.id IS NOT NULL THEN true ELSE false END AS is_unlocked`;
+      joinExtra = `LEFT JOIN content_votes cv ON cv.content_id = c.id AND cv.user_id = $3
+                   LEFT JOIN user_unlocks uu ON uu.content_id = c.id AND uu.user_id = $3`;
+      params.push(req.user.id);
+    }
+
+    const result = await query(
+      `SELECT c.*, u.username AS submitter_username${selectExtra}
+       FROM content c
+       LEFT JOIN users u ON u.id = c.submitted_by
+       ${joinExtra}
+       WHERE c.submitted_by IS NOT NULL AND c.status = 'active'
+       ORDER BY ${orderClause}
+       LIMIT $1 OFFSET $2`,
+      params
+    );
+
+    const countResult = await query(
+      "SELECT COUNT(*) FROM content WHERE submitted_by IS NOT NULL AND status = 'active'"
+    );
+
+    const total = parseInt(countResult.rows[0].count);
+
+    res.json({
+      data: result.rows,
+      total,
+      page,
+      total_pages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    console.error('Get feed error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /mine - Current user's submissions
+router.get('/mine', authenticate, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const result = await query(
+      `SELECT c.*, u.username AS submitter_username,
+              cv.vote_type AS user_vote,
+              CASE WHEN uu.id IS NOT NULL THEN true ELSE false END AS is_unlocked
+       FROM content c
+       LEFT JOIN users u ON u.id = c.submitted_by
+       LEFT JOIN content_votes cv ON cv.content_id = c.id AND cv.user_id = $1
+       LEFT JOIN user_unlocks uu ON uu.content_id = c.id AND uu.user_id = $1
+       WHERE c.submitted_by = $1
+       ORDER BY c.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+
+    const countResult = await query(
+      'SELECT COUNT(*) FROM content WHERE submitted_by = $1',
+      [req.user.id]
+    );
+
+    const total = parseInt(countResult.rows[0].count);
+
+    res.json({
+      data: result.rows,
+      total,
+      page,
+      total_pages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    console.error('Get my content error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /:category
 router.get('/:category', optionalAuth, async (req, res) => {
   try {
@@ -189,6 +283,22 @@ router.post('/submit', authenticate, async (req, res) => {
         content_text, question, answer, option_a, option_b, option_c, option_d,
         correct_option, author, category, content_type || 'text', req.user.id
       ]
+    );
+
+    // Award 1 point for content submission
+    await query(
+      `UPDATE users
+       SET points_balance = points_balance + 1,
+           total_points_earned = total_points_earned + 1
+       WHERE id = $1`,
+      [req.user.id]
+    );
+
+    // Record the transaction
+    await query(
+      `INSERT INTO points_transactions (user_id, transaction_type, points_amount, description)
+       VALUES ($1, 'earned', 1, 'Content submission')`,
+      [req.user.id]
     );
 
     res.status(201).json(result.rows[0]);
